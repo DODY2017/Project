@@ -19,7 +19,7 @@ from solution import solution
 import time
 import random
 import math
-def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
+def gso_mfo(func_obj, lb, ub, agents_number, epochs, trainInput,trainOutput,net,dim):
 #def gso(agents_number, dim, func_obj, epochs, step_size, r0, rs, b, k_neigh, dims_lim = [-4,4], random_step=False, virtual_individual = False, individual_updated=None, program_ends = None):
 
 #initilization for GSO
@@ -37,7 +37,7 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 	
 	assert len(dims_lim) == 2
 	assert type(agents_number) == int
-	#assert type(dim) == int
+	assert type(dim) == int
 
 #initialization for MFO
 	N=agents_number
@@ -63,7 +63,6 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 	#########################
 	previous_population=np.copy(Moth_pos)
 	previous_fitness=Moth_fitness
-	
 	#start of GSO
 	s=solution()
 	s.optimizer="GSO-MFO hybrid"
@@ -92,8 +91,7 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 	"""
 
 	#random initiation
-	glowworms = np.random.uniform(lb,ub,[agents_number,dim]) * (ub-lb)+lb
-	#print ('glowworms  ',glowworms)
+	glowworms = np.random.uniform(0,1,[agents_number,dim]) * (ub-lb)+lb
 
 	
 	#distances
@@ -112,7 +110,6 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 	"""
 	def luciferin_update(last_luciferin,fitness):
 		l = ((1-luciferin_decay)*last_luciferin) + (luciferin_enhancement*fitness)
-
 		return l
 
 	"""
@@ -188,9 +185,6 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 
 		#new_position = glowworm + step_size*(toward-glowworm)/norm
 		new_position = best_flame_so_far + step_size*(toward-glowworm)/norm
-		#print ('norm ',norm)
-		#print ('position update phase ',new_position)
-
 		#new_position = glowworm + step_size*(best_flame_so_far-glowworm)/norm
 		
 		#update distmatrix for all associated cells (not all matrix)
@@ -242,7 +236,6 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 	EXECUTION
 	"""
 	fitness = np.zeros(agents_number)
-
 	best_fitness_history = []
 	best_luciferins_history=[]
 	#HillClimbing()
@@ -257,16 +250,16 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 	#epoch_luciferins_history = []
 	for epoch in range(epochs):
 	    #update population using MFO explotation
+	    #print ('entering MFO=',epoch)
 	    Flame_no=round(N-epoch*((N-1)/Max_iteration));
-
 	    for i in range(0,N):
 		# Check if moths go out of the search spaceand bring it back
-		Moth_pos[i,:]=np.clip(Moth_pos[i,:], lb, ub)
-		Flame_pos[i,:]=np.clip(Flame_pos[i,:], lb, ub)
+			#print ('MFO loop', i)
+			Moth_pos[i,:]=np.clip(Moth_pos[i,:], lb, ub) # evaluate moths
+			Flame_pos[i,:]=np.clip(Flame_pos[i,:], lb, ub)
 
-        	# evaluate moths
-        	Moth_fitness[i]=objf(Moth_pos[i,:])
-        	Flame_fitness[i]=objf(Flame_pos[i,:])  
+			Moth_fitness[i]=objf(Moth_pos[i,:],trainInput,trainOutput,net)
+			Flame_fitness[i]=objf(Flame_pos[i,:],trainInput,trainOutput,net)  
 
             if epoch==0:
     		# Sort the first population of moths
@@ -289,9 +282,11 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
         		# Update the flames
         	best_flames=sorted_population;
         	best_flame_fitness=fitness_sorted;
+        	Best_flame_score=fitness_sorted[0]
+		Best_flame_pos=sorted_population[0,:]
             # Update the position best flame obtained so far
             previous_population=Moth_pos;
-	    previous_fitness=Moth_fitness;
+            previous_fitness=Moth_fitness;
             # a linearly dicreases from -1 to -2 to calculate t in Eq. (3.12)
        	    a=-1+epoch*((-1)/Max_iteration);
     	    # Loop counter
@@ -310,73 +305,59 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
           	        t=(a-1)*random.random()+1;
           	        #% Eq. (3.12)
           	        Moth_pos[i,j]=distance_to_flame*math.exp(b*t)*math.cos(t*2*math.pi)+sorted_population[Flame_no,j]
-          	        
+	    #print ('exiting MFO=',epoch)
 	    #GSO to start from here
 	    
+	    #print ('entering GSO=',epoch)
 	    #epoch_fitness_history = []
 	    epoch_luciferins_history=[]
 	    #update all glowworms luciferin
 	    for i in range(agents_number):
-	        li = luciferins[i]
-	        if epoch == 0:
-	            fitness[i]=1-func_obj(glowworms[i])
-
-	            #fitness[i]=func_obj(glowworms[i],trainInput,trainOutput,net)
-	        luciferins[i] = luciferin_update(li,fitness[i])
-	        #print ('luciferins in gso  ',luciferins[i])
-
-	        #epoch_fitness_history.append(fitness[i])
-	        epoch_luciferins_history.append(luciferins[i])
-	            #best_fitness_history.append(max(epoch_fitness_history))
-		#get the best for current generation
-            best_luciferins_history.append(max(epoch_luciferins_history))
-            best_index=np.argmax(epoch_luciferins_history)
-            best_fitness_history.append(fitness[best_index])
-            best_individual=glowworms[best_index]
-
-            #if epoch==0:
-                #	best_individual=glowworms[best_index]
-                #best_fitness=best_luciferins_history[-1]
-                #	best_fitness=fitness[best_index]
-                #	best_epoch=epoch
-	    #elif best_luciferins_history[-1]>best_fitness:
-		#	best_individual=glowworms[best_index]
-			#best_fitness=best_luciferins_history[-1]
-		#	best_fitness=fitness[best_index]
-		#	best_epoch=epoch
-			
-		#movement phase
+	    	#print j
+	    	li = luciferins[i];
+	    	if epoch == 0:	#fitness[i]=func_obj(glowworms[i])
+	    		#fitness[j]=func_obj(glowworms[j],trainInput,trainOutput,net);
+	    		fitness[i]=1-func_obj(best_flames[i],trainInput,trainOutput,net);
+	    	luciferins[i] = luciferin_update(li,fitness[i]);#epoch_fitness_history.append(fitness[i])
+	    	epoch_luciferins_history.append(luciferins[i]); #best_fitness_history.append(max(epoch_fitness_history))
+	    #get the best for current generation
+	    #print 'getting best'
+	    best_luciferins_history.append(max(epoch_luciferins_history))
+	    best_index=np.argmax(epoch_luciferins_history)
+	    best_fitness_history.append(fitness[best_index])
+	    best_individual=glowworms[best_index]
+	    #print 'got best'
+	    #movement phase
+	    #print 'movoo'
 	    for i in range(agents_number):
-	        #find best neighbors
-	        neighbors = find_neighbors(i)
-	        change = False
-	        if len(neighbors) > 0:
-	            toward_index = follow(i,neighbors)
+	    	#find best neighbors
+	    	neighbors = find_neighbors(i)
+	    	change = False
+	    	if len(neighbors) > 0:
+	    		toward_index = follow(i,neighbors)
+	    		newpos=position_update(i,toward_index, best_flames[0,:])
+	    		#if func_obj(newpos,trainInput,trainOutput,net) > func_obj(glowworms[i],trainInput,trainOutput,net):
+	    		if 1-func_obj(newpos,trainInput,trainOutput,net) > 1-func_obj(glowworms[i],trainInput,trainOutput,net):
+	    			glowworms[i] = newpos
+	    			change = True
+	    	elif virtual_individual:
+	    		virtual = virtual_glowworm(i)
+	    		glowworms[i] = position_update(i,virtual,best_flames[0,:])
+	    		change = True
+	    	else:
+	    		print('Done everything')#Updated fitness, but not luciferin
+	    	if change:
+	    		#fitness[i] = func_obj(glowworms[i])
+	    		#fitness[i] = func_obj(glowworms[i],trainInput,trainOutput,net)
+	    		fitness[i] = 1-func_obj(best_flames[i],trainInput,trainOutput,net)
+	    	ranges[i] = range_update(i,neighbors)
+	    #print ('exiting GSO=',epoch)
+	    convergence.append(1-best_fitness_history[-1])
+	    Moth_pos[i]= glowworms[i]
 
-	            newpos=position_update(i,toward_index, best_flames[0,:])
-
-	            #fitnew=1-func_obj(newpos,trainInput,trainOutput,net)
-	            #lnew=luciferin_update(luciferin_init,fitnew)
-	            #if func_obj(newpos) > func_obj(glowworms[i]):
-	                #if (func_obj(newpos,trainInput,trainOutput,net)>func_obj(glowworms[i],trainInput,trainOutput,net)):
-	            glowworms[i] = newpos
-	            #print ('glowworm i  ',glowworms[i], i)
-	            change = True
-		elif virtual_individual:
-		    virtual = virtual_glowworm(i)
-		    glowworms[i] = position_update(i,virtual,best_flames[0,:])
-		    change = True
-		else:
-		    print('Done everything')
-		    #Updated fitness, but not luciferin
-		if change:
-		    fitness[i] = 1-func_obj(glowworms[i])
-   
-		    #fitness[i] = func_obj(glowworms[i],trainInput,trainOutput,net)
-		ranges[i] = range_update(i,neighbors)
-
-            convergence.append(1-best_fitness_history[-1])
-            print(s.optimizer, epoch,'> best fitness:', 1-best_fitness_history[-1])
+	    #convergence.append(best_fitness_history[-1])
+	    print(s.optimizer, epoch,'> best fitness:', 1-best_fitness_history[-1])
+	    #print(s.optimizer, epoch,'> best fitness:', best_fitness_history[-1])
             #if 1-best_fitness_history[-1]<0.211:
             #if best_fitness_history[-1]>0.99:
             #	print 'break at generation' + str(epoch)
@@ -385,7 +366,7 @@ def gso_mfo(func_obj, lb, ub, dim, agents_number, epochs):
 	s.endTime=time.strftime("%Y-%m-%d-%H-%M-%S")
 	s.executionTime=timerEnd-timerStart
 	s.convergence=convergence
-	s.optimizer="GSO-MFO no"
+	s.optimizer="GSO-MFO hybrid"
 	s.bestIndividual = best_individual
 	s.objfname=func_obj.__name__
 	#s.best = best_fitness
